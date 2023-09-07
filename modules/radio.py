@@ -39,6 +39,13 @@ def radioFunctions():
             settings.modType = ""
             settings.srcImage = "usb.png"
             settings.stationMem = ""
+        elif settings.source == "Bluetooth":
+            settings.rdsText = settings.usbTrackName[1][:25]
+            settings.freq = settings.usbTrackName[0]
+            settings.radioBand =  settings.current_time_USB
+            settings.modType = ""
+            settings.srcImage = "bluetooth.png"
+            settings.stationMem = ""
 
     if settings.isLRBal or settings.isRFBal or settings.isBass or settings.isTreble or settings.isLoudness or settings.isAutoVol or settings.isEQPreset:
         settings.showAudioMenu = True

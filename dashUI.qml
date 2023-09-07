@@ -3,11 +3,12 @@ import QtQuick.Window 2.0
 import QtGraphicalEffects 1.14
 import QtQuick.Controls 1.1
 
+
 ApplicationWindow {
     width: 1024
     height: 600
     visible: true
-	visibility: "Maximized"
+    visibility: "Windowed"
     color: colorVal
     title: qsTr("Car Stuff")
     property string rdsText: "Plc"
@@ -46,7 +47,17 @@ ApplicationWindow {
     property var tripImage: ["trip_gasstation.png", "trip_fuel.png", "trip_distance.png"]
     property bool diagBoxShow: false
     property string diagTextTxt: "Text"
-
+    property bool kmlBoxShow: false
+    property string kmlTextTitle: "Pair Request"
+    property string kmlTextTxt: "placeholder"
+    property int phoneStatus: 0
+    property var phoneStatuses: ["notConnected.png", "connected.png"]
+    property var phoneSignals: ["signal1.png", "signal1.png", "signal2.png", "signalFull.png", "signalFull.png"]
+    property int phoneSignal: 0
+    property var phoneBats: ["bat0.png", "bat1.png", "bat2.png", "bat3.png", "bat4.png"]
+    property int phoneBat: 0
+    property bool kmlPairShow: false
+    property string kmlPairTxt: "Placeholder"
 
 
     //flags: Qt.FramelessWindowHint | Qt.Window
@@ -828,6 +839,122 @@ ApplicationWindow {
             }
         }
 
+        Rectangle {
+            id: kmlBox
+            x: 265
+            y: 205
+            width: 475
+            height: 174
+            color: "#e6ffffff"
+            visible: kmlPairShow
+            radius: 15
+
+            Text {
+                id: kmlTitle
+                x: 8
+                y: 8
+                width: 459
+                height: 36
+                color: "#c40000"
+                text: kmlTextTitle
+                font.pixelSize: 26
+                horizontalAlignment: Text.AlignHCenter
+                font.bold: true
+            }
+
+            Button {
+                id: pairAcc
+                x: 141
+                y: 125
+                visible: true
+                text: "Ok"
+                focus: true
+                checked: false
+                state: ""
+                smooth: true
+                enabled: true
+                onClicked: {kml.sendAcc("test")}
+                KeyNavigation.left: pairAcc
+                KeyNavigation.right: pairCancel
+            }
+            Button {
+                id: pairCancel
+                x: 260
+                y: 125
+                text: "Cancel"
+                onClicked: {kml.sendDeny("test")}
+                KeyNavigation.left: pairAcc
+            }
+
+           Text {
+               id: text4
+               x: 65
+               y: 73
+               width: 346
+               height: 28
+               text: kmlPairTxt
+               font.pixelSize: 18
+               horizontalAlignment: Text.AlignHCenter
+           }
+        }
+
+        Rectangle {
+            id: statusBox
+            x: 141
+            y: 21
+            width: 737
+            height: 29
+            color: "#60ffffff"
+            radius: 5
+            border.width: 0
+
+            Image {
+                id: image
+                x: 18
+                y: 6
+                width: 14
+                height: 17
+                source: "img/kml/" + phoneStatuses[phoneStatus]
+                fillMode: Image.PreserveAspectCrop
+            }
+
+            Image {
+                id: image4
+                x: 58
+                y: 6
+                width: 14
+                height: 17
+                source: "img/kml/" + phoneSignals[phoneSignal]
+                fillMode: Image.PreserveAspectCrop
+            }
+
+            Text {
+                id: kmlText
+                x: 252
+                y: 4
+                width: 233
+                height: 21
+                visible: kmlBoxShow
+                text: kmlTextTxt
+                font.pixelSize: 17
+                horizontalAlignment: Text.AlignHCenter
+                font.bold: true
+            }
+
+            Image {
+                id: image5
+                x: 38
+                y: 6
+                width: 14
+                height: 17
+                source: "img/kml/" + phoneBats[phoneBat]
+                fillMode: Image.PreserveAspectCrop
+            }
+        }
+
+
     }
 
 }
+
+

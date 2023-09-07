@@ -18,6 +18,7 @@ from PyQt5.QtQuick import QQuickView
 from modules.radio import *
 import modules.settings as settings
 from modules.canbus import *
+from modules.kml import *
 from modules.display import *
 
 # from vars import *
@@ -46,6 +47,8 @@ def main():
     th = threading.Thread(target=canRead)
     th.start()
 
+    kml = KML()
+    settings.engine.rootContext().setContextProperty("kml", kml)
     
     def update_display():
         radioFunctions()

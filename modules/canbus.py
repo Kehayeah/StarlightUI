@@ -2,14 +2,14 @@ import can.interfaces.slcan
 import modules.settings as settings
 import time
 from modules.display import *
+from modules.kml import *
+from pynput.keyboard import Key, Controller
 
-
+keyboard = Controller()
 
 def canRead():
-    
-    global bus
-    # bus = can.Bus(interface='socketcan', channel='can0', receive_own_messages=True)
-    bus = can.ThreadSafeBus(interface='socketcan', channel='can0', bitrate=125000)
+
+    # settings.bus = can.ThreadSafesettings.bus(interface='socketcan', channel='can0', bitrate=125000)
     #Define stuff
     curr_timer = time.time()
     curr_shutdown = time.time()
@@ -25,8 +25,9 @@ def canRead():
     settings.tripMode = 0
     settings.diagBoxShow = False
     power = True
-    # print (bus)
-    for msg in bus:
+    test = False
+    # print (settings.bus)
+    for msg in settings.bus:
         id = msg.arbitration_id
         # print (id)
         if id == 0x0F6:
@@ -210,16 +211,16 @@ def canRead():
             scale = 16
             bitNum = 8
             messageStr = [bin(int(n, 16))[2:].zfill(bitNum) for n in messageSplit]
-            #if messageStr[0][1] == "1":
-                #settings.menuItem = "Menu"
-                #msgMenu = can.Message(arbitration_id=0xDF, data=[0x90, 0x00, 0x70], is_extended_id=False)
-                #task = bus.send_periodic(msgMenu, 0.1)
-                #task.start()
-                #settings.showMainMenu = True
-            #elif messageStr[2][3] == "1" and settings.menuItem == "Menu":
-                #settings.menuItem = "None"
-                #task.stop()
-                #settings.showMainMenu = False
+            if messageStr[0][1] == "1":
+                settings.menuItem = "Menu"
+                msgMenu = can.Message(arbitration_id=0xDF, data=[0x90, 0x00, 0x70], is_extended_id=False)
+                task = settings.bus.send_periodic(msgMenu, 0.1)
+                task.start()
+                settings.showMainMenu = True
+            elif messageStr[2][3] == "1" and settings.menuItem == "Menu":
+                settings.menuItem = "None"
+                task.stop()
+                settings.showMainMenu = False
             if messageStr[1][3] == "1":
                 #Mode button will change trip for now
                 settings.tripMode += 1
@@ -232,6 +233,19 @@ def canRead():
                 else:
                     call("uhubctl -p 2 -l 1-1 -a 0", shell=True)
                     settings.darkMode = True
+            elif messageStr[5][5] == "1":
+                print("r")
+                keyboard.press(Key.right)
+                keyboard.release(Key.right)
+            elif messageStr[5][7] == "1":
+                print("l")
+                keyboard.press(Key.left)
+                keyboard.release(Key.left)
+            elif messageStr[2][1] == "1":
+                print("Space")
+                keyboard.press(Key.space)
+                time.sleep(0.2)
+                keyboard.release(Key.space)
         elif id == 0x0A4:
             # This one gets the track name from the CD. Works with MP3s, no idea if it works with Audio CDs (tests show that normal CDs don't have track data)
             message = msg.data
@@ -250,7 +264,7 @@ def canRead():
             cdName = cdName + singleFrame
             # Flow Control Frame
             msgFCF = can.Message(arbitration_id=0x09F, data=[0x30, 0x00, 0x0A], is_extended_id=False)
-            bus.send(msgFCF)
+            settings.bus.send(msgFCF)
             if cdframeNum == 7:
                 #When the length of the variable is the same as what the radio declared at the start, 
                 #push it into the Global and split is at the NULL character so we have artist and track name separate
@@ -265,9 +279,9 @@ def canRead():
             message = (msg.data).hex("#")
             messageSplit = message.split("#")
             secondsForm = int(messageSplit[6], 16) / 4
-            current_time_USB = str("{:02}".format(int(messageSplit[7], 16))) + ":" +  str("{:02}".format(int(secondsForm)))
+            settings.current_time_USB = str("{:02}".format(int(messageSplit[7], 16))) + ":" +  str("{:02}".format(int(secondsForm)))
         elif id == 0x2E3:
-            # This one is the USB text frame. It contains the track and artist data. Not documented so it was hard to find and even harder to find the FCF for it
+            # This one is the USB and BT text frame. It contains the track and artist data. Not documented so it was hard to find and even harder to find the FCF for it
             # It's a CAN-TP frame, starting with 10 (because it's a multiframe) followed by the length of the name and then 0x63 (no idea why but I'm dumb)
             # This piece of shit code takes the frame, hexifies it and splits it so we get the text length from it. Then, it shaves the first 3 bytes off
             # of the original frame and passes it to the "completed" name variable. The frames after the initial one only have one byte we don't need, the index one
@@ -275,28 +289,55 @@ def canRead():
             message = msg.data
             messageHex = (msg.data).hex("#")
             messageSplit = messageHex.split("#")
-            # The radio sends a frame with data [10, 60]. This signals that it will start sending the new title. We identify that and reinitiallize all of our variables.
-            if messageSplit[0] == "01" and messageSplit[1] == "60":
-                frameNum = 0
-                usbName = ""
-            
-            frameNum = frameNum + 1
-            if frameNum == 2:
-                frameLen = int(messageSplit[1], 16)
-                nameClean = message[3:]
-                singleFrame = nameClean.decode('ISO-8859-1')
+
+            if settings.source == "Bluetooth":
+                if messageSplit[0] == "10" and messageSplit[2] == "63":
+                    frameNum = 0
+                    usbName = ""
+                
+                frameNum = frameNum + 1
+                if frameNum == 1:
+                    frameLen = int(messageSplit[1], 16)
+                    nameClean = message[3:]
+                    singleFrame = nameClean.decode('ISO-8859-1')
+                    usbName = singleFrame
+                else:
+                    nameClean = message[1:]
+                    singleFrame = nameClean.decode('ISO-8859-1')
+
+                if not frameNum == 1:
+                    usbName = usbName + singleFrame
+                                #Send the Flow Control Frame over to the radio so it gives us the rest of the frames
+                msgFCF = can.Message(arbitration_id=351, data=[0x30, 0x00, 0x0A], is_extended_id=False)
+                settings.bus.send(msgFCF)
+                if frameLen == (len(usbName) + 1):
+                    #When the length of the variable is the same as what the radio declared at the start, 
+                    #push it into the Global and split is at the NULL character so we have artist and track name separate
+                    settings.usbTrackName = usbName.split("\x00")
+
             else:
-                nameClean = message[1:]
-                singleFrame = nameClean.decode('ISO-8859-1')
-            if not frameNum == 1:
-                usbName = usbName + singleFrame
-            #Send the Flow Control Frame over to the radio so it gives us the rest of the frames
-            msgFCF = can.Message(arbitration_id=351, data=[0x30, 0x00, 0x0A], is_extended_id=False)
-            bus.send(msgFCF)
-            if frameLen == (len(usbName) + 1):
-                #When the length of the variable is the same as what the radio declared at the start, 
-                #push it into the Global and split is at the NULL character so we have artist and track name separate
-                settings.usbTrackName = usbName.split("\x00")
+                # The radio sends a frame with data [10, 60]. This signals that it will start sending the new title. We identify that and reinitiallize all of our variables.
+                if messageSplit[0] == "01" and messageSplit[1] == "60":
+                    frameNum = 0
+                    usbName = ""
+                
+                frameNum = frameNum + 1
+                if frameNum == 2:
+                    frameLen = int(messageSplit[1], 16)
+                    nameClean = message[3:]
+                    singleFrame = nameClean.decode('ISO-8859-1')
+                else:
+                    nameClean = message[1:]
+                    singleFrame = nameClean.decode('ISO-8859-1')
+                if not frameNum == 1:
+                    usbName = usbName + singleFrame
+                #Send the Flow Control Frame over to the radio so it gives us the rest of the frames
+                msgFCF = can.Message(arbitration_id=351, data=[0x30, 0x00, 0x0A], is_extended_id=False)
+                settings.bus.send(msgFCF)
+                if frameLen == (len(usbName) + 1):
+                    #When the length of the variable is the same as what the radio declared at the start, 
+                    #push it into the Global and split is at the NULL character so we have artist and track name separate
+                    settings.usbTrackName = usbName.split("\x00")
             time.sleep(0.1)
         elif id == 0x125 and settings.discType == "MP3 Disc":
             # List Thing. Each title is 20 chars long. When 1st byte is 06, get the selected track
@@ -362,7 +403,7 @@ def canRead():
                     initialList = True
 
             msgFCF = can.Message(arbitration_id=0x11F, data=[0x30, 0x00, 0x0A], is_extended_id=False)
-            bus.send(msgFCF)
+            settings.bus.send(msgFCF)
             time.sleep(0.15)
         elif id == 0x221 and settings.tripMode == 0:
             #Trip Time my dude
@@ -405,11 +446,78 @@ def canRead():
             else:
                 settings.diagBoxShow = False
                 settings.engine.rootObjects()[0].setProperty('diagBoxShow', settings.diagBoxShow)
+        elif id == 0x1A3:
+            # take the useful data from each byte and pass it to the other function
+            message = msg.data
+            second_byte = message[1]
+            call_avail = (second_byte >> 1) & 0x01
+            connected = (message[0] >> 7) & 0x01
+            signal = message[2]
+            battery = message[3]
+            sms_avail = (second_byte >> 6) & 0x01
+            pair_request = message[5] 
 
-def canSend():
-    #Main Menu task (Fix shit code later)
-    msgList = can.Message(arbitration_id=0x09F, data=[0x30, 0x00, 0x0A], is_extended_id=False)
-    print (settings.menuItem)
-    if settings.menuItem == "List":
-        bus.send(msgList)
-        settings.menuItem = "None"
+
+            data = {
+                "connected": connected,
+                "signal": signal,
+                "battery": battery,
+                "call": call_avail,
+                "sms": sms_avail,
+                "pair_request": pair_request
+            }
+
+            kmlHandler(data)
+            # print("currently on call")
+        elif id == 0x123:
+            message = msg.data
+            messagehex = (msg.data).hex("#")
+            messageSplit = messagehex.split("#")
+            # print("statusByte: ",statusByte)
+            # print("Whole Hex: ", message.hex("#"))
+
+            # first byte is 10, means new stuff is coming
+            if messageSplit[0] == "10":
+                frameNum = 0
+                callerName = ""
+                msgType = messageSplit[2]
+            
+            frameNum = frameNum + 1
+            if frameNum == 1:
+                frameLen = int(messageSplit[1], 16)
+                if msgType == "80":
+                    nameClean = message[4:]
+                else:
+                    nameClean = message[5:]
+                    
+                singleFrame = nameClean.decode('ISO-8859-1')
+                callerName = singleFrame
+            else:
+                nameClean = message[1:]
+                singleFrame = nameClean.decode('ISO-8859-1')
+
+            if not frameNum == 1:
+                callerName = callerName + singleFrame
+            
+            #Send the Flow Control Frame over to the radio so it gives us the rest of the frames
+            msgFCF = can.Message(arbitration_id=0x29F, data=[0x30, 0x00, 0x0A], is_extended_id=False)
+            settings.bus.send(msgFCF)
+            if contains_only_null_bytes(callerName) :
+                callerName = "Unknown Number"
+
+            if msgType == "80":
+                #pair request. Sends repeated signal to Radio so we can listen to keypress
+                settings.engine.rootObjects()[0].setProperty('kmlPairTxt', callerName.split("\x00")[0])
+                msgMenu = can.Message(arbitration_id=0xDF, data=[0x90, 0x00, 0x70], is_extended_id=False)
+                task = settings.bus.send_periodic(msgMenu, 0.2, 10)
+                task.start()
+            elif msgType == "10":
+                settings.engine.rootObjects()[0].setProperty('kmlTextTxt', "Call: "+callerName.split("\x00")[0])
+
+               
+          
+def contains_only_null_bytes(string):
+    for char in string:
+        if char != '\x00':
+            return False
+    return True

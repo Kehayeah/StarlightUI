@@ -1,14 +1,18 @@
 from PyQt5.QtQml import QQmlApplicationEngine
+import can.interfaces.slcan
 
 def init():
     global rdsText, isSeeking, source, freq, stationMem, modType, radioBand, volume, isVolumeChanging, isVolumeStillChanging, radioPower, isLRBal, isRFBal, isBass, isTreble, isLoudness, isAutoVol, isEQPreset
     global lrValue, rfValue, bassValue, trebleValue, loudValue, autoVolValue, eqPresetValue
     global trackAll, discType, srcImage, cdCurrentTrack, currentTrackTime, menuItem, showMainMenu, current_time_USB, theID, usbTrackName, cdTrackDetails, trackList, showList, trackListSel
-    global tripInfo, darkMode, tripMode, diagBoxShow
+    global tripInfo, darkMode, tripMode, diagBoxShow, kmlBoxShow,kmlPairShow
     global engine
     global tripImage
     global showAudioMenu
+    global bus
 
+
+    bus = can.ThreadSafeBus(interface='slcan', channel='/dev/ttyUSB0@115200', bitrate=125000)
     engine = QQmlApplicationEngine()
     rdsText  = ""
     source = ""
@@ -54,3 +58,5 @@ def init():
     tripMode = 0
     tripImage = ["trip_distance.png", "trip_fuel.png", "trip_gasstation.png"]
     diagBoxShow = False
+    kmlBoxShow = False
+    kmlPairShow = False
